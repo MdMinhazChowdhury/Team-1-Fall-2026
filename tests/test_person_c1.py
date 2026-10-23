@@ -1,7 +1,7 @@
 
 import pytest
 
-from src.models import Deck
+from src.person_b.models import Deck
 from src.person_c1.flashcard import Flashcard
 from src.person_c1.card_factory import CardFactory
 from src.person_c1.card_service import CardService

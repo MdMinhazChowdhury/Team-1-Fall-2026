@@ -1,6 +1,6 @@
 
 from dataclasses import dataclass, field
-from src.models import new_id
+from src.person_b.models import new_id
 
 
 @dataclass
