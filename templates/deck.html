@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>{{ deck.title }}</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+
+    <header>
+        <h1>{{ deck.title }}</h1>
+
+        {% if deck.description %}
+            <p>{{ deck.description }}</p>
+        {% endif %}
+    </header>
+
+    <main>
+
+        <section>
+
+            <h2>Flashcards</h2>
+            
+            <h3>Add a Flashcard</h3>
+
+            {% if error %}
+              <p style="color: red;">{{ error }}</p>
+            {% endif %}
+
+            <form method="POST"
+              action="{{ url_for('add_card', deck_id=deck.deck_id) }}">
+
+              <p>
+                  <label for="question">Question</label><br>
+                  <input
+                     type="text"
+                     id="question"
+                     name="question"
+                     placeholder="Enter a question"
+                     required
+                   >
+              </p>
+
+              <p>
+                  <label for="answer">Answer</label><br>
+                  <input
+                     type="text"
+                     id="answer"
+                     name="answer"
+                     placeholder="Enter an answer"
+                     required
+                   >
+              </p>
+
+              <button type="submit">Add Flashcard</button>
+
+            </form>
+
+            <hr>
+
+            {% if cards %}
+
+                {% for card in cards %}
+
+                    <div class="deck-item">
+                        <h3>Question</h3>
+                        <p>{{ card.question }}</p>
+
+                        <h3>Answer</h3>
+                        <p>{{ card.answer }}</p>
+
+                        <form method="POST"
+                          action="{{ url_for('mark_difficult',
+                               deck_id=deck.deck_id,
+                               card_id=card.card_id) }}">
+
+                            <button type="submit">Mark as Difficult</button>
+
+                        </form>
+
+                        <h3>Edit Flashcard</h3>
+
+                        <form method="POST"
+                              action="{{ url_for('edit_card',
+                                  deck_id=deck.deck_id,
+                                  card_id=card.card_id) }}">
+
+                            <p>
+                              <label>Question</label><br>
+                              <input
+                                  type="text"
+                                  name="question"
+                                  value="{{ card.question }}"
+                                  required
+                                >
+                            </p>
+
+                            <p>
+                              <label>Answer</label><br>
+                              <input
+                                  type="text"
+                                  name="answer"
+                                  value="{{ card.answer }}"
+                                  required
+                                >
+                            </p>
+
+                            <button type="submit">Save Changes</button>
+
+                        </form>
+
+                        <form method="POST"
+                          action="{{ url_for('delete_card',
+                              deck_id=deck.deck_id,
+                              card_id=card.card_id) }}">
+
+                          <button type="submit">Delete Flashcard</button>
+                        </form>
+
+                        {% if card.difficult %}
+                            <p><strong>Marked as Difficult</strong></p>
+                        {% endif %}
+
+                    </div>
+
+                {% endfor %}
+
+            {% else %}
+
+                <p>This deck does not have any flashcards yet.</p>
+
+            {% endif %}
+
+            <p>
+                <a href="{{ url_for('dashboard') }}">
+                    Back to Dashboard
+                </a>
+            </p>
+
+        </section>
+
+    </main>
+
+</body>
+
+</html>

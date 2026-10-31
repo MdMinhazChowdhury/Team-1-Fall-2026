@@ -1,0 +1,36 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcard Study Application</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <header>
+        <h1>Flashcard Study Application</h1>
+        <p>Your personal space to organize and study.</p>
+    </header>
+
+    <main>
+        <section class="welcome">
+            <h2>Welcome!</h2>
+            <p>Build your knowledge one flashcard at a time.</p>
+
+            <div class="actions">
+               <a href="{{ url_for('login') }}" class="button-link">Log In</a>
+
+               <a href="{{ url_for('register') }}" class="button-link">
+                   Create Account
+               </a>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>CMSC 430 Group 1 - Fall 2026</p>
+    </footer>
+</body>
+</html>
