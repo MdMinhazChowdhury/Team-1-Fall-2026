@@ -6,11 +6,14 @@ import pytest
 from src.person_b.auth_service import AuthService
 
 
-@pytest.fixture
-def auth():
-    """Create a fresh service for each test."""
-    return AuthService()
+from src.database import Database
 
+
+@pytest.fixture
+def auth(tmp_path):
+    """Create a fresh database and service for each test."""
+    database = Database(tmp_path / "test_auth.db")
+    return AuthService(database)
 
 def test_register_user(auth):
     """A valid registration creates a user."""
@@ -103,3 +106,54 @@ def test_username_is_case_insensitive(auth):
     auth.register("Alyssa", "alyssa@example.com", "Password123")
 
     assert auth.login("ALYSSA", "Password123") is not None
+
+def test_user_persists_after_creating_new_auth_service(tmp_path):
+    """A registered user remains available to a new service."""
+    database_path = tmp_path / "persistent_auth.db"
+
+    # First service registers the user.
+    first_database = Database(database_path)
+    first_auth = AuthService(first_database)
+
+    original_user = first_auth.register(
+        "Alyssa",
+        "alyssa@example.com",
+        "Password123"
+    )
+
+    # Create a completely new service using the same database.
+    second_database = Database(database_path)
+    second_auth = AuthService(second_database)
+
+    # The new service can retrieve and authenticate the user.
+    logged_in_user = second_auth.login(
+        "Alyssa",
+        "Password123"
+    )
+
+    assert logged_in_user is not None
+    assert logged_in_user.user_id == original_user.user_id
+
+
+def test_user_count_persists_after_new_auth_service(tmp_path):
+    """The database retains registered users between services."""
+    database_path = tmp_path / "persistent_count.db"
+
+    first_auth = AuthService(Database(database_path))
+
+    first_auth.register(
+        "Alyssa",
+        "alyssa@example.com",
+        "Password123"
+    )
+
+    first_auth.register(
+        "Jordan",
+        "jordan@example.com",
+        "Password456"
+    )
+
+    # Create a new service with no existing user cache.
+    second_auth = AuthService(Database(database_path))
+
+    assert second_auth.user_count == 2
