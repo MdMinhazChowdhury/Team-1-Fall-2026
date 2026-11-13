@@ -68,6 +68,24 @@ class Database:
                         ON DELETE SET NULL
                 );
 
+
+                CREATE TABLE IF NOT EXISTS flashcards (
+                    card_id TEXT PRIMARY KEY,
+                     deck_id TEXT NOT NULL,
+                     question TEXT NOT NULL,
+                     answer TEXT NOT NULL,
+                     difficult INTEGER NOT NULL DEFAULT 0
+                     CHECK (difficult IN (0, 1)),
+
+                    FOREIGN KEY (deck_id)
+                     REFERENCES decks(deck_id)
+                      ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_flashcards_deck
+ON flashcards(deck_id);
+
+
                 CREATE INDEX IF NOT EXISTS idx_decks_owner
                 ON decks(owner_id);
 
