@@ -7,11 +7,13 @@ from src.person_b.auth_service import AuthService
 from src.person_b.deck_service import DeckService
 from src.person_b.deck_factory import DeckFactory
 
+from src.database import Database
 
 @pytest.fixture
-def setup_services():
+def setup_services(tmp_path):
     """Create two users and a deck service for testing."""
-    auth = AuthService()
+    database = Database(tmp_path / "test_decks.db")
+    auth = AuthService(database)
 
     auth.register("Alyssa", "alyssa@example.com", "Password123")
     auth.register("Jordan", "jordan@example.com", "Password456")
@@ -157,3 +159,48 @@ def test_factory_creates_deck(setup_services):
 
     assert deck.title == "Chemistry"
     assert deck.owner_id == auth.get_current_user().user_id
+def test_deck_persists_after_creating_new_deck_service(setup_services):
+    """A deck remains available after creating a new DeckService."""
+    auth, service = setup_services
+
+    auth.login("Alyssa", "Password123")
+
+    original_deck = service.create_deck("Biology")
+
+    new_service = DeckService(auth)
+
+    saved_deck = new_service.get_deck(original_deck.deck_id)
+
+    assert saved_deck is not None
+    assert saved_deck.title == "Biology"
+    assert saved_deck.owner_id == original_deck.owner_id
+
+
+def test_category_and_deck_assignment_persist(setup_services):
+    """Categories and their deck assignments remain in SQLite."""
+    auth, service = setup_services
+
+    auth.login("Alyssa", "Password123")
+
+    category = service.create_category("Science")
+
+    deck = service.create_deck(
+        "Biology",
+        category_id=category.category_id
+    )
+
+    new_service = DeckService(auth)
+
+    saved_categories = new_service.list_categories()
+    saved_decks = new_service.list_decks()
+
+    assert len(saved_categories) == 1
+    assert saved_categories[0].name == "Science"
+
+    assert len(saved_decks) == 1
+    assert saved_decks[0].title == "Biology"
+    assert saved_decks[0].category_id == category.category_id
+ 
+    assert deck.deck_id in saved_categories[0].deck_ids
+
+
