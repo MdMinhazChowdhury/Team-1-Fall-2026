@@ -200,3 +200,137 @@ def test_nfr4_search_modes_independent():
     assert len(deck_results) == 1
 
     print("\nNFR4 - Both search modes PASSED")
+
+
+from src.person_c1.card_factory import CardFactory
+
+
+def test_reject_empty_question():
+    with pytest.raises(ValueError):
+        CardFactory.create_card(
+            question="",
+            answer="Valid answer",
+            deck_id="deck1"
+        )
+
+
+def test_reject_empty_answer():
+    with pytest.raises(ValueError):
+        CardFactory.create_card(
+            question="Valid question",
+            answer="",
+            deck_id="deck1"
+        )
+
+
+def test_reject_whitespace_question():
+    with pytest.raises(ValueError):
+        CardFactory.create_card(
+            question="   ",
+            answer="Valid answer",
+            deck_id="deck1"
+        )
+
+
+def test_reject_whitespace_answer():
+    with pytest.raises(ValueError):
+        CardFactory.create_card(
+            question="Valid question",
+            answer="   ",
+            deck_id="deck1"
+        )
+
+from src.person_b.models import Deck
+from src.person_c1.card_service import CardService
+
+
+class Sprint2FakeDeckService:
+    def __init__(self):
+        self.deck = Deck(
+            title="Computer Science",
+            owner_id="user1"
+        )
+
+    def get_deck(self, deck_id):
+        if deck_id != self.deck.deck_id:
+            raise PermissionError("Deck not found.")
+        return self.deck
+
+
+@pytest.fixture
+def sprint2_service():
+    deck_service = Sprint2FakeDeckService()
+    service = CardService(deck_service)
+    return service, deck_service.deck
+
+
+def test_sprint2_invalid_deck_id(sprint2_service):
+    service, deck = sprint2_service
+
+    with pytest.raises(PermissionError):
+        service.add_card(
+            "nonexistent-deck",
+            "Question",
+            "Answer"
+        )
+
+    assert service.cards == {}
+    assert deck.card_ids == []
+
+
+def test_sprint2_get_nonexistent_card(sprint2_service):
+    service, deck = sprint2_service
+
+    assert service.get_card("missing-card") is None
+
+
+def test_sprint2_edit_nonexistent_card(sprint2_service):
+    service, deck = sprint2_service
+
+    assert service.edit_card(
+        "missing-card",
+        "New question",
+        "New answer"
+    ) is False
+
+
+def test_sprint2_delete_nonexistent_card(sprint2_service):
+    service, deck = sprint2_service
+
+    assert service.delete_card("missing-card") is False
+
+
+def test_sprint2_invalid_edit_preserves_data(sprint2_service):
+    service, deck = sprint2_service
+
+    card = service.add_card(
+        deck.deck_id,
+        "Original question",
+        "Original answer"
+    )
+
+    with pytest.raises(ValueError):
+        service.edit_card(
+            card.card_id,
+            "",
+            "Updated answer"
+        )
+
+    assert card.question == "Original question"
+    assert card.answer == "Original answer"
+
+
+def test_sprint2_delete_preserves_other_cards(sprint2_service):
+    service, deck = sprint2_service
+
+    first = service.add_card(
+        deck.deck_id, "Question 1", "Answer 1"
+    )
+    second = service.add_card(
+        deck.deck_id, "Question 2", "Answer 2"
+    )
+
+    assert service.delete_card(first.card_id) is True
+    assert service.get_card(first.card_id) is None
+    assert service.get_card(second.card_id) == second
+    assert second.card_id in deck.card_ids
