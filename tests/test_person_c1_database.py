@@ -165,3 +165,59 @@ def test_deleting_deck_cascades_to_cards(setup_database):
         connection.close()
 
     assert row is None
+
+
+def test_real_backend_flashcard_integration(tmp_path):
+    from src.person_b.auth_service import AuthService
+    from src.person_b.deck_service import DeckService
+
+    database = Database(tmp_path / "integration_test.db")
+
+    auth = AuthService(database)
+
+    auth.register(
+        "integrationuser",
+        "integration@example.com",
+        "SecurePass123!"
+    )
+
+    auth.login("integrationuser", "SecurePass123!")
+
+    deck_service = DeckService(auth)
+    deck = deck_service.create_deck("Computer Science")
+
+    card_service = CardService(deck_service)
+
+    card = card_service.add_card(
+        deck.deck_id,
+        "What is Python?",
+        "A programming language"
+    )
+
+    assert card.question == "What is Python?"
+
+    saved = card_service.get_card(card.card_id)
+    assert saved is not None
+    assert saved.answer == "A programming language"
+
+    assert card_service.edit_card(
+        card.card_id,
+        "What is Java?",
+        "Another programming language"
+    )
+
+    assert card_service.get_card(card.card_id).question == "What is Java?"
+
+    assert card_service.mark_difficult(card.card_id)
+
+    new_card_service = CardService(deck_service)
+    restored = new_card_service.get_card(card.card_id)
+
+    assert restored is not None
+    assert restored.question == "What is Java?"
+    assert restored.difficult is True
+
+    assert len(new_card_service.get_cards(deck.deck_id)) == 1
+
+    assert new_card_service.delete_card(card.card_id)
+    assert new_card_service.get_card(card.card_id) is None
