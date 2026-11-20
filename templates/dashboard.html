@@ -21,6 +21,24 @@
 
             <h2>My Decks</h2>
             
+            <h3>Search Decks</h3>
+
+            <form method="GET" action="{{ url_for('dashboard') }}">
+                <p>
+                  <label for="deck-search">Search by Deck Title</label><br>
+                  <input
+                    type="text"
+                    id="deck-search"
+                    name="q"
+                    placeholder="Enter a deck title"
+                    value="{{ search_query }}"
+                    >
+                </p>
+
+                <button type="submit">Search</button>
+                <a href="{{ url_for('dashboard') }}">Clear Search</a>
+            </form>
+
             <h3>Create a New Deck</h3>
 
             {% if error %}
@@ -72,7 +90,11 @@
 
             {% else %}
 
-                <p>You haven't created any decks yet.</p>
+                {% if search_query %}
+                    <p>No decks matched your search.</p>
+                {% else %}
+                    <p>You haven't created any decks yet.</p>
+                {% endif %}
 
             {% endif %}
 

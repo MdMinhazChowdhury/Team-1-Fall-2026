@@ -4,6 +4,7 @@ from flask import Flask, render_template, request, redirect, url_for
 from src.person_b.auth_service import AuthService
 from src.person_b.deck_service import DeckService
 from src.person_c1.card_service import CardService
+from src.person_c1.search_service import SearchService
 
 # Initialize authentication service
 auth_service = AuthService()
@@ -57,18 +58,23 @@ def login():
 # Deck dashboard
 @app.route("/dashboard")
 def dashboard():
-
     try:
-        # Retrieve decks belonging to the logged-in user
         decks = deck_service.list_decks()
+
+        # Get the optional search term
+        search_query = request.args.get("q", "").strip()
+
+        # Filter decks when a search term is provided
+        if search_query:
+            decks = SearchService.search_decks(decks, search_query)
 
         return render_template(
             "dashboard.html",
-            decks=decks
+            decks=decks,
+            search_query=search_query
         )
 
     except PermissionError:
-        # Redirect users who are not logged in
         return redirect(url_for("login"))
 
 # Create a new deck
@@ -94,22 +100,37 @@ def create_deck():
             error=str(error)
         )
 
+
 # View a deck and its flashcards
 @app.route("/deck/<deck_id>")
 def view_deck(deck_id):
-
     try:
         deck = deck_service.get_deck(deck_id)
         cards = card_service.get_cards(deck_id)
 
+        # Get search and filter options
+        search_query = request.args.get("q", "").strip()
+        show_difficult = request.args.get("difficult") == "1"
+
+        # Search flashcards
+        if search_query:
+            cards = SearchService.search_cards(cards, search_query)
+
+        # Filter difficult flashcards
+        if show_difficult:
+            cards = SearchService.get_difficult_cards(cards)
+
         return render_template(
             "deck.html",
             deck=deck,
-            cards=cards
+            cards=cards,
+            search_query=search_query,
+            show_difficult=show_difficult
         )
 
     except PermissionError:
         return redirect(url_for("login"))
+
 
 # Create a new flashcard
 @app.route("/deck/<deck_id>/add-card", methods=["POST"])
@@ -182,18 +203,21 @@ def edit_card(deck_id, card_id):
         )
 
 # Mark a flashcard as difficult
+
 @app.route("/deck/<deck_id>/mark-difficult/<card_id>", methods=["POST"])
 def mark_difficult(deck_id, card_id):
-
     try:
-        card_service.mark_difficult(card_id)
+        card = card_service.get_card(card_id)
 
-        return redirect(
-            url_for("view_deck", deck_id=deck_id)
-        )
+        if card is not None:
+            # Reverse the current difficult status
+            card_service.mark_difficult(card_id, not card.difficult)
+
+        return redirect(url_for("view_deck", deck_id=deck_id))
 
     except PermissionError:
         return redirect(url_for("login"))
+
 
 
 

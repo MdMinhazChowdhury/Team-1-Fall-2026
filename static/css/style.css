@@ -61,3 +61,121 @@ footer {
     padding: 20px;
     color: #667085;
 }
+
+
+/* Horizontal flashcard layout */
+.flashcard {
+    display: grid;
+    grid-template-columns: 1fr 150px;
+    gap: 15px 25px;
+    align-items: start;
+
+    background-color: #ffffff;
+    border: 1px solid #dce2ec;
+    border-radius: 10px;
+
+    padding: 20px;
+    margin: 15px 0;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.flashcard-content {
+    display: flex;
+    gap: 30px;
+    align-items: flex-start;
+}
+
+.flashcard-content > div {
+    flex: 1;
+    min-width: 0;
+}
+
+.flashcard-content h3 {
+    margin-top: 0;
+    color: #243b64;
+}
+
+.flashcard-content p {
+    overflow-wrap: anywhere;
+}
+
+.flashcard-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flashcard-actions form {
+    margin: 0;
+}
+
+.action-button {
+    width: 100%;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.delete-button {
+    background-color: #a83232;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+
+.difficult-label {
+    color: #a83232;
+}
+
+.flashcard-edit {
+    grid-column: 1 / -1;
+    border-top: 1px solid #e1e5ec;
+    padding-top: 12px;
+}
+
+.flashcard-edit h3 {
+    margin-top: 0;
+}
+
+.flashcard-edit form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.flashcard-edit input {
+    flex: 1;
+    min-width: 180px;
+    padding: 9px;
+}
+
+.flashcard-edit button {
+    padding: 9px 15px;
+    cursor: pointer;
+}
+
+/* Smaller screens */
+@media (max-width: 650px) {
+    .flashcard {
+        grid-template-columns: 1fr;
+    }
+
+    .flashcard-content {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .flashcard-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .flashcard-actions form {
+        flex: 1;
+    }
+
+    .flashcard-edit {
+        grid-column: 1;
+    }
+}
