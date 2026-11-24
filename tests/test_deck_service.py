@@ -1,13 +1,12 @@
-
 """Unit tests for deck and category management."""
 
 import pytest
 
+from src.database import Database
 from src.person_b.auth_service import AuthService
 from src.person_b.deck_service import DeckService
 from src.person_b.deck_factory import DeckFactory
 
-from src.database import Database
 
 @pytest.fixture
 def setup_services(tmp_path):
@@ -15,161 +14,247 @@ def setup_services(tmp_path):
     database = Database(tmp_path / "test_decks.db")
     auth = AuthService(database)
 
-    auth.register("Alyssa", "alyssa@example.com", "Password123")
-    auth.register("Jordan", "jordan@example.com", "Password456")
+    alyssa = auth.register(
+        "Alyssa",
+        "alyssa@example.com",
+        "Password123"
+    )
+    jordan = auth.register(
+        "Jordan",
+        "jordan@example.com",
+        "Password456"
+    )
 
     service = DeckService(auth)
-    return auth, service
+
+    return auth, service, alyssa, jordan
 
 
 def test_create_deck(setup_services):
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    deck = service.create_deck("Biology")
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
 
     assert deck.title == "Biology"
-    assert deck.owner_id == auth.get_current_user().user_id
+    assert deck.owner_id == alyssa.user_id
 
 
 def test_login_required(setup_services):
-    """A user must log in before creating a deck."""
-    auth, service = setup_services
+    """A missing user ID must not be allowed to create a deck."""
+    auth, service, alyssa, jordan = setup_services
 
     with pytest.raises(PermissionError):
-        service.create_deck("Biology")
+        service.create_deck("Biology", current_user_id=None)
 
 
 def test_create_category(setup_services):
-    """A logged-in user can create a category."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    category = service.create_category("Science")
+    category = service.create_category(
+        "Science",
+        current_user_id=alyssa.user_id
+    )
 
     assert category.name == "Science"
+    assert category.owner_id == alyssa.user_id
 
 
 def test_duplicate_category_rejected(setup_services):
-    """Duplicate category names are not allowed."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    service.create_category("Science")
+    service.create_category("Science", current_user_id=alyssa.user_id)
 
     with pytest.raises(ValueError):
-        service.create_category("SCIENCE")
+        service.create_category(
+            "SCIENCE",
+            current_user_id=alyssa.user_id
+        )
 
 
 def test_filter_decks_by_category(setup_services):
-    """A category filter returns only matching decks."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    science = service.create_category("Science")
-    history = service.create_category("History")
+    science = service.create_category(
+        "Science",
+        current_user_id=alyssa.user_id
+    )
+    history = service.create_category(
+        "History",
+        current_user_id=alyssa.user_id
+    )
 
     biology = service.create_deck(
-        "Biology", category_id=science.category_id
+        "Biology",
+        current_user_id=alyssa.user_id,
+        category_id=science.category_id
     )
     service.create_deck(
-        "World History", category_id=history.category_id
+        "World History",
+        current_user_id=alyssa.user_id,
+        category_id=history.category_id
     )
 
-    assert service.list_decks(science.category_id) == [biology]
+    assert service.list_decks(
+        current_user_id=alyssa.user_id,
+        category_id=science.category_id
+    ) == [biology]
 
 
 def test_rename_deck(setup_services):
-    """The owner can rename a deck."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    deck = service.create_deck("Biology")
-    service.rename_deck(deck.deck_id, "Chemistry")
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
+    service.rename_deck(
+        deck.deck_id,
+        "Chemistry",
+        current_user_id=alyssa.user_id
+    )
 
     assert deck.title == "Chemistry"
 
 
 def test_assign_and_remove_category(setup_services):
-    """A deck can be assigned to and removed from a category."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    category = service.create_category("Science")
-    deck = service.create_deck("Biology")
+    category = service.create_category(
+        "Science",
+        current_user_id=alyssa.user_id
+    )
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
 
-    service.assign_category(deck.deck_id, category.category_id)
+    service.assign_category(
+        deck.deck_id,
+        category.category_id,
+        current_user_id=alyssa.user_id
+    )
 
     assert deck.category_id == category.category_id
     assert deck.deck_id in category.deck_ids
 
-    service.assign_category(deck.deck_id, None)
+    service.assign_category(
+        deck.deck_id,
+        None,
+        current_user_id=alyssa.user_id
+    )
 
     assert deck.category_id is None
     assert deck.deck_id not in category.deck_ids
 
 
 def test_delete_deck(setup_services):
-    """Deleting a deck removes it from the user's collection."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    auth, service, alyssa, jordan = setup_services
 
-    deck = service.create_deck("Biology")
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
 
-    assert service.delete_deck(deck.deck_id) is True
-    assert service.list_decks() == []
+    assert service.delete_deck(
+        deck.deck_id,
+        current_user_id=alyssa.user_id
+    ) is True
+
+    assert service.list_decks(current_user_id=alyssa.user_id) == []
 
 
 def test_other_user_cannot_access_deck(setup_services):
     """A user cannot access another user's deck."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
-    deck = service.create_deck("Private Biology")
+    auth, service, alyssa, jordan = setup_services
 
-    auth.login("Jordan", "Password456")
+    deck = service.create_deck(
+        "Private Biology",
+        current_user_id=alyssa.user_id
+    )
 
     with pytest.raises(PermissionError):
-        service.get_deck(deck.deck_id)
+        service.get_deck(
+            deck.deck_id,
+            current_user_id=jordan.user_id
+        )
+
+
+def test_other_user_cannot_rename_or_delete_deck(setup_services):
+    """A different user cannot change or delete a private deck."""
+    auth, service, alyssa, jordan = setup_services
+
+    deck = service.create_deck(
+        "Private Biology",
+        current_user_id=alyssa.user_id
+    )
+
+    with pytest.raises(PermissionError):
+        service.rename_deck(
+            deck.deck_id,
+            "Changed",
+            current_user_id=jordan.user_id
+        )
+
+    with pytest.raises(PermissionError):
+        service.delete_deck(
+            deck.deck_id,
+            current_user_id=jordan.user_id
+        )
 
 
 def test_other_user_cannot_assign_category(setup_services):
-    """A user cannot assign another user's category or access another user's deck."""
-    auth, service = setup_services
+    """A user cannot assign their category to another user's deck."""
+    auth, service, alyssa, jordan = setup_services
 
-    auth.login("Alyssa", "Password123")
-    deck = service.create_deck("Biology")
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
 
-    auth.login("Jordan", "Password456")
-    category = service.create_category("Jordan Science")
+    category = service.create_category(
+        "Jordan Science",
+        current_user_id=jordan.user_id
+    )
 
     with pytest.raises(PermissionError):
-        service.assign_category(deck.deck_id, category.category_id)
-
+        service.assign_category(
+            deck.deck_id,
+            category.category_id,
+            current_user_id=jordan.user_id
+        )
 
 
 def test_factory_creates_deck(setup_services):
-    """The deck factory creates a deck for the specified owner."""
-    auth, service = setup_services
-    auth.login("Alyssa", "Password123")
+    """The factory creates a deck for the supplied owner."""
+    auth, service, alyssa, jordan = setup_services
 
     deck = DeckFactory.create_deck(
         "Chemistry",
-        auth.get_current_user().user_id,
+        alyssa.user_id
     )
 
     assert deck.title == "Chemistry"
-    assert deck.owner_id == auth.get_current_user().user_id
+    assert deck.owner_id == alyssa.user_id
+
+
 def test_deck_persists_after_creating_new_deck_service(setup_services):
     """A deck remains available after creating a new DeckService."""
-    auth, service = setup_services
+    auth, service, alyssa, jordan = setup_services
 
-    auth.login("Alyssa", "Password123")
-
-    original_deck = service.create_deck("Biology")
+    original_deck = service.create_deck(
+        "Biology",
+        current_user_id=alyssa.user_id
+    )
 
     new_service = DeckService(auth)
 
-    saved_deck = new_service.get_deck(original_deck.deck_id)
+    saved_deck = new_service.get_deck(
+        original_deck.deck_id,
+        current_user_id=alyssa.user_id
+    )
 
     assert saved_deck is not None
     assert saved_deck.title == "Biology"
@@ -177,22 +262,28 @@ def test_deck_persists_after_creating_new_deck_service(setup_services):
 
 
 def test_category_and_deck_assignment_persist(setup_services):
-    """Categories and their deck assignments remain in SQLite."""
-    auth, service = setup_services
+    """Categories and deck assignments remain in SQLite."""
+    auth, service, alyssa, jordan = setup_services
 
-    auth.login("Alyssa", "Password123")
-
-    category = service.create_category("Science")
+    category = service.create_category(
+        "Science",
+        current_user_id=alyssa.user_id
+    )
 
     deck = service.create_deck(
         "Biology",
+        current_user_id=alyssa.user_id,
         category_id=category.category_id
     )
 
     new_service = DeckService(auth)
 
-    saved_categories = new_service.list_categories()
-    saved_decks = new_service.list_decks()
+    saved_categories = new_service.list_categories(
+        current_user_id=alyssa.user_id
+    )
+    saved_decks = new_service.list_decks(
+        current_user_id=alyssa.user_id
+    )
 
     assert len(saved_categories) == 1
     assert saved_categories[0].name == "Science"
@@ -200,7 +291,25 @@ def test_category_and_deck_assignment_persist(setup_services):
     assert len(saved_decks) == 1
     assert saved_decks[0].title == "Biology"
     assert saved_decks[0].category_id == category.category_id
- 
+
     assert deck.deck_id in saved_categories[0].deck_ids
 
 
+def test_users_only_see_their_own_decks(setup_services):
+    """Each user receives only their own decks."""
+    auth, service, alyssa, jordan = setup_services
+
+    alyssa_deck = service.create_deck(
+        "Alyssa's Deck",
+        current_user_id=alyssa.user_id
+    )
+    jordan_deck = service.create_deck(
+        "Jordan's Deck",
+        current_user_id=jordan.user_id
+    )
+
+    alyssa_decks = service.list_decks(current_user_id=alyssa.user_id)
+    jordan_decks = service.list_decks(current_user_id=jordan.user_id)
+
+    assert [deck.deck_id for deck in alyssa_decks] == [alyssa_deck.deck_id]
+    assert [deck.deck_id for deck in jordan_decks] == [jordan_deck.deck_id]

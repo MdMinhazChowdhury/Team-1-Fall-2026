@@ -1,12 +1,9 @@
-
 """Unit tests for account registration and authentication."""
 
 import pytest
 
-from src.person_b.auth_service import AuthService
-
-
 from src.database import Database
+from src.person_b.auth_service import AuthService
 
 
 @pytest.fixture
@@ -15,10 +12,13 @@ def auth(tmp_path):
     database = Database(tmp_path / "test_auth.db")
     return AuthService(database)
 
+
 def test_register_user(auth):
     """A valid registration creates a user."""
     user = auth.register(
-        "Alyssa", "alyssa@example.com", "Password123"
+        "Alyssa",
+        "alyssa@example.com",
+        "Password123"
     )
 
     assert user.username == "Alyssa"
@@ -29,7 +29,9 @@ def test_register_user(auth):
 def test_password_is_hashed(auth):
     """The plain-text password must not be stored."""
     user = auth.register(
-        "Alyssa", "alyssa@example.com", "Password123"
+        "Alyssa",
+        "alyssa@example.com",
+        "Password123"
     )
 
     assert user.password_hash != "Password123"
@@ -43,7 +45,7 @@ def test_login_with_username(auth):
     user = auth.login("Alyssa", "Password123")
 
     assert user is not None
-    assert auth.get_current_user() is user
+    assert user.username == "Alyssa"
 
 
 def test_login_with_email(auth):
@@ -53,6 +55,7 @@ def test_login_with_email(auth):
     user = auth.login("ALYSSA@example.com", "Password123")
 
     assert user is not None
+    assert user.username == "Alyssa"
 
 
 def test_short_password_is_rejected(auth):
@@ -84,21 +87,15 @@ def test_duplicate_email_is_rejected(auth):
 
 
 def test_wrong_password_fails(auth):
-    """An incorrect password does not log the user in."""
+    """An incorrect password does not authenticate the user."""
     auth.register("Alyssa", "alyssa@example.com", "Password123")
 
     assert auth.login("Alyssa", "WrongPassword") is None
-    assert auth.get_current_user() is None
 
 
-def test_logout(auth):
-    """Logout clears the current user."""
-    auth.register("Alyssa", "alyssa@example.com", "Password123")
-    auth.login("Alyssa", "Password123")
-
-    auth.logout()
-
-    assert auth.get_current_user() is None
+def test_unknown_username_fails(auth):
+    """An unknown username or email does not authenticate."""
+    assert auth.login("unknown", "Password123") is None
 
 
 def test_username_is_case_insensitive(auth):
@@ -107,25 +104,36 @@ def test_username_is_case_insensitive(auth):
 
     assert auth.login("ALYSSA", "Password123") is not None
 
+
+def test_login_does_not_store_current_user_on_service(auth):
+    """The shared service does not store one current user's identity."""
+    auth.register("Alyssa", "alyssa@example.com", "Password123")
+    auth.register("Jordan", "jordan@example.com", "Password456")
+
+    alyssa = auth.login("Alyssa", "Password123")
+    jordan = auth.login("Jordan", "Password456")
+
+    assert alyssa is not None
+    assert jordan is not None
+
+    # Both logins return their own user; neither sets shared login state.
+    assert alyssa.user_id != jordan.user_id
+    assert not hasattr(auth, "_current_user_id")
+    assert not hasattr(auth, "get_current_user")
+
+
 def test_user_persists_after_creating_new_auth_service(tmp_path):
     """A registered user remains available to a new service."""
     database_path = tmp_path / "persistent_auth.db"
 
-    # First service registers the user.
-    first_database = Database(database_path)
-    first_auth = AuthService(first_database)
-
+    first_auth = AuthService(Database(database_path))
     original_user = first_auth.register(
         "Alyssa",
         "alyssa@example.com",
         "Password123"
     )
 
-    # Create a completely new service using the same database.
-    second_database = Database(database_path)
-    second_auth = AuthService(second_database)
-
-    # The new service can retrieve and authenticate the user.
+    second_auth = AuthService(Database(database_path))
     logged_in_user = second_auth.login(
         "Alyssa",
         "Password123"
@@ -140,20 +148,9 @@ def test_user_count_persists_after_new_auth_service(tmp_path):
     database_path = tmp_path / "persistent_count.db"
 
     first_auth = AuthService(Database(database_path))
+    first_auth.register("Alyssa", "alyssa@example.com", "Password123")
+    first_auth.register("Jordan", "jordan@example.com", "Password456")
 
-    first_auth.register(
-        "Alyssa",
-        "alyssa@example.com",
-        "Password123"
-    )
-
-    first_auth.register(
-        "Jordan",
-        "jordan@example.com",
-        "Password456"
-    )
-
-    # Create a new service with no existing user cache.
     second_auth = AuthService(Database(database_path))
 
     assert second_auth.user_count == 2

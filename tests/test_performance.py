@@ -39,31 +39,39 @@ def test_backend_operation_performance(tmp_path):
     assert logged_in_user is not None
     assert logged_in_user.user_id == user.user_id
 
+    # Get the ID of the authenticated user.
+    current_user_id = logged_in_user.user_id
+
     # 3. Measure deck creation.
     start = time.perf_counter()
 
-    deck = service.create_deck("Biology")
+    deck = service.create_deck(
+        "Biology",
+        current_user_id=current_user_id
+    )
 
     deck_creation_time = time.perf_counter() - start
 
     # 4. Measure deck retrieval.
     start = time.perf_counter()
 
-    retrieved_deck = service.get_deck(deck.deck_id)
+    retrieved_deck = service.get_deck(
+        deck.deck_id,
+        current_user_id=current_user_id
+    )
 
     deck_retrieval_time = time.perf_counter() - start
 
     assert retrieved_deck is not None
     assert retrieved_deck.deck_id == deck.deck_id
+    assert retrieved_deck.owner_id == current_user_id
 
-    # Display actual measurements in milliseconds.
     print("\n--- Person B Performance Test Results ---")
     print(f"User registration: {registration_time * 1000:.2f} ms")
     print(f"User login: {login_time * 1000:.2f} ms")
     print(f"Deck creation: {deck_creation_time * 1000:.2f} ms")
     print(f"Deck retrieval: {deck_retrieval_time * 1000:.2f} ms")
 
-    # Broad performance limits, not official NFR targets.
     assert registration_time < 2.0
     assert login_time < 2.0
     assert deck_creation_time < 1.0
