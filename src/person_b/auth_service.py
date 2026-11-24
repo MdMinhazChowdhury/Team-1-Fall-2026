@@ -1,4 +1,3 @@
-
 """Manage user registration and authentication using SQLite."""
 
 import hashlib
@@ -11,18 +10,20 @@ from src.person_b.models import User
 
 
 class AuthService:
-    """Register users and manage login sessions using a database."""
+    """Register users and verify login credentials.
+
+    This service does not store a currently logged-in user.
+    Flask sessions should store each request's authenticated user ID.
+    """
 
     def __init__(self, database=None):
         """Use the shared database or an explicitly supplied database."""
         self.database = database if database is not None else Database()
         self.database.initialize_database()
 
-        self._users = {}
-        self._current_user_id = None
-
     @staticmethod
     def _normalize(value):
+        """Normalize a username or email for case-insensitive lookup."""
         return value.strip().casefold()
 
     @staticmethod
@@ -53,11 +54,9 @@ class AuthService:
             return False
 
         actual_hash = cls._hash_password(password, salt)
+        actual_hash_value = actual_hash.split("$", 1)[1]
 
-        return hmac.compare_digest(
-            actual_hash.split("$", 1)[1],
-            expected_hash
-        )
+        return hmac.compare_digest(actual_hash_value, expected_hash)
 
     @staticmethod
     def _row_to_user(row):
@@ -95,7 +94,8 @@ class AuthService:
         connection = self.database.get_connection()
 
         try:
-            connection.execute("""
+            connection.execute(
+                """
                 INSERT INTO users (
                     user_id,
                     username,
@@ -104,13 +104,15 @@ class AuthService:
                     created_at
                 )
                 VALUES (?, ?, ?, ?, ?)
-            """, (
-                user.user_id,
-                user.username,
-                user.email,
-                user.password_hash,
-                user.created_at
-            ))
+                """,
+                (
+                    user.user_id,
+                    user.username,
+                    user.email,
+                    user.password_hash,
+                    user.created_at
+                )
+            )
 
             connection.commit()
 
@@ -123,12 +125,15 @@ class AuthService:
         finally:
             connection.close()
 
-        self._users[user.user_id] = user
-
         return user
 
     def login(self, username_or_email, password):
-        """Log in using either a username or email address."""
+        """Verify credentials and return the user, or None if invalid.
+
+        This method deliberately does not save a current user on the
+        AuthService instance. The Flask route should store user.user_id
+        in that browser's Flask session after successful login.
+        """
         if not isinstance(username_or_email, str):
             return None
 
@@ -140,12 +145,15 @@ class AuthService:
         connection = self.database.get_connection()
 
         try:
-            row = connection.execute("""
+            row = connection.execute(
+                """
                 SELECT *
                 FROM users
                 WHERE username = ? COLLATE NOCASE
                    OR email = ? COLLATE NOCASE
-            """, (key, key)).fetchone()
+                """,
+                (key, key)
+            ).fetchone()
 
         finally:
             connection.close()
@@ -156,43 +164,28 @@ class AuthService:
         if not self._verify_password(password, row["password_hash"]):
             return None
 
-        user_id = row["user_id"]
-
-        # Reuse an existing object when available.
-        user = self._users.get(user_id)
-
-        if user is None:
-            user = self._row_to_user(row)
-            self._users[user_id] = user
-
-        self._current_user_id = user.user_id
-
-        return user
-
-    def logout(self):
-        """Clear the current login session."""
-        self._current_user_id = None
-
-    def get_current_user(self):
-        """Return the currently logged-in user."""
-        if self._current_user_id is None:
-            return None
-
-        return self.get_user_by_id(self._current_user_id)
+        return self._row_to_user(row)
 
     def get_user_by_id(self, user_id):
-        """Retrieve a user from the cache or database."""
-        if user_id in self._users:
-            return self._users[user_id]
+        """Retrieve a user by ID.
+
+        The caller must supply the ID from the authenticated Flask
+        session. This method does not determine who is logged in.
+        """
+        if user_id is None:
+            return None
 
         connection = self.database.get_connection()
 
         try:
-            row = connection.execute("""
+            row = connection.execute(
+                """
                 SELECT *
                 FROM users
                 WHERE user_id = ?
-            """, (user_id,)).fetchone()
+                """,
+                (user_id,)
+            ).fetchone()
 
         finally:
             connection.close()
@@ -200,10 +193,7 @@ class AuthService:
         if row is None:
             return None
 
-        user = self._row_to_user(row)
-        self._users[user.user_id] = user
-
-        return user
+        return self._row_to_user(row)
 
     @property
     def user_count(self):
@@ -211,10 +201,12 @@ class AuthService:
         connection = self.database.get_connection()
 
         try:
-            result = connection.execute("""
+            result = connection.execute(
+                """
                 SELECT COUNT(*) AS total
                 FROM users
-            """).fetchone()
+                """
+            ).fetchone()
 
             return result["total"]
 
